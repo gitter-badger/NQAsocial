@@ -1,0 +1,253 @@
+#!/usr/bin/python
+
+#Uses bottle.py, used under the MIT License. This file (C) Copyright 2014 Nathan Krantz-Fire. Some rights reserved (MPL 2.0).
+
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at http://mozilla.org/MPL/2.0/.
+
+#Dependency Modules
+import datetime
+import time
+import os
+import pickle
+import urllib2
+try:
+    from bottle import route, run, request, error, redirect, response, BaseRequest, get, post, template
+except ImportError:
+    bottlepyfile = open(os.path.dirname(os.path.realpath(__file__)) + '/bottle.py','w')
+    bottlepyfile.write(urllib2.urlopen('https://raw.githubusercontent.com/bottlepy/bottle/master/bottle.py').read())
+    bottlepyfile.close()
+    from bottle import route, run, request, error, redirect, response, BaseRequest, get, post, template
+#Infrastructure
+class user_noun():
+    def __init__(self,username,password,email,following,posts,id):
+        self.username = username
+        self.password = password
+        self.email = email
+        self.following = following
+        self.posts = posts
+        self.id = id
+        deleted = False
+class post_noun():
+    def __init__(self,contents,timestamp,comptimestamp):
+        self.contents = contents.replace('<','&#60;').replace('>','&#62;')
+        self.timestamp = timestamp
+        self.comptimestamp = comptimestamp
+
+def createUser(username,password,email):
+    id = len(users)-1
+    users.append(user_noun(username,password,email,[],[],id))
+    exportdb()
+def postAsUser(userID,contents):
+    users[userID].posts.append(post_noun(contents,str(datetime.datetime.now()),time.time()))
+    exportdb()
+def followUser(followerID,followeeID):
+    if not followeeID in users[followerID].following:
+        users[followerID].following.append(followeeID)
+    exportdb()
+def unfollowUser(unfollowerID,unfolloweeID):
+    while unfolloweeID in users[unfollowerID].following:
+        users[unfollowerID].following.remove(unfolloweeID)
+    exportdb()
+def getTimeline(userID):
+    postsToGet = []
+    for i in users[userID].posts:
+        postsToGet.append(i)
+        postsToGet[len(postsToGet)-1].author = users[userID].username
+    for i in users[userID].following:
+        for i2 in users[i].posts:
+            postsToGet.append(i2)
+            postsToGet[len(postsToGet)-1].author = users[i].username
+    postsToGet.sort(key=lambda x:x.comptimestamp, reverse=True)
+    return postsToGet
+def formatTimeline(postlist):
+    endresult = ""
+    for i in postlist:
+        endresult = endresult +"<p>" +i.author +", " +i.timestamp +":<br/>" +i.contents +"</p>"
+    return endresult
+def formatUserList(userlist):
+    endresult = ""
+    for i in userlist:
+        endresult = endresult +"<p><a href='users/" +i.username +"'>" +i.username +"</a></p>"
+    return endresult
+def getAll():
+    postsToGet = []
+    for i in users:
+        for i2 in i.posts:
+            postsToGet.append(i2)
+            postsToGet[len(postsToGet)-1].author = i.username
+    postsToGet.sort(key=lambda x:x.comptimestamp, reverse=True)
+    return postsToGet
+def check_login(u,p):
+    for i in range(len(users)):
+        if users[i].username == u:
+            if users[i].password == p:
+                 return True
+            else:
+                 return False
+def getUserID(username):
+    for i in range(len(users)):
+        if users[i].username == username:
+            return i
+def exportdb():
+    pickle.dump(users,open(os.path.dirname(os.path.realpath(__file__)) + '/db.p','wb'))
+
+
+
+@route('/login', method="POST")
+def do_login():
+    if request.get_cookie("username", secret="ur38293849fhjf328923h98fr832h9rh893") == None or request.get_cookie("password", secret="ur38293849fhjf328923h98fr832h9rh893") == None or (not check_login(request.get_cookie("username", secret="ur38293849fhjf328923h98fr832h9rh893"),request.get_cookie("password", secret="ur38293849fhjf328923h98fr832h9rh893"))): # If the user is not already logged in.
+        username = request.forms.get('username')
+        password = hash(request.forms.get('password'))
+        if check_login(username, password):
+            response.set_cookie("username",username, secret="ur38293849fhjf328923h98fr832h9rh893")
+            response.set_cookie("password",password, secret="ur38293849fhjf328923h98fr832h9rh893")
+            redirect('/')
+        else:
+            return "<p>Login was unsuccessful. Your username or password is incorrect.</p><form action='login' method='post'><p>Username: <input name='username' type='text'/><p>Password: <input name='password' type='password' /></p><p><input type='submit' value='Login' /></p></form><p><a href='signupscreen'>Sign Up</a></p>"
+    else:
+        redirect('/')
+
+#Database Import
+if os.path.isfile(os.path.dirname(os.path.realpath(__file__)) + '/db.p'):
+    users = pickle.load(open(os.path.dirname(os.path.realpath(__file__)) + '/db.p','rb'))
+else:
+    users = []
+
+# Web interface
+@route('/loginscreen')
+def login_screen():
+    if request.get_cookie("username", secret="ur38293849fhjf328923h98fr832h9rh893") == None or request.get_cookie("password", secret="ur38293849fhjf328923h98fr832h9rh893") == None or (not check_login(request.get_cookie("username", secret="ur38293849fhjf328923h98fr832h9rh893"),request.get_cookie("password", secret="ur38293849fhjf328923h98fr832h9rh893"))): # If the user is not already logged in.
+        return "<p>Login:</p><form action='login' method='post'><p>Username: <input name='username' type='text'/><p>Password: <input name='password' type='password' /></p><p><input type='submit' value='Login' /></p></form><p><a href='signupscreen'>Sign Up</a></p><p>Written by backtick.town user nk. (C) Copyright 2014. All rights reserved. Posts are the property of their posters, not me. This site uses bottle.py, under the MIT License.</p>"
+    else:
+        redirect('/')
+@route('/signupscreen')
+def signup_screen():
+    if request.get_cookie("username", secret="ur38293849fhjf328923h98fr832h9rh893") == None or request.get_cookie("password", secret="ur38293849fhjf328923h98fr832h9rh893") == None or (not check_login(request.get_cookie("username", secret="ur38293849fhjf328923h98fr832h9rh893"),request.get_cookie("password", secret="ur38293849fhjf328923h98fr832h9rh893"))): # If the user is not already logged in.
+        return "<p>Sign Up:</p><form action='signup' method='post'><p>Username: <input name='username' type='text'/><p>Password: <input name='password' type='password' /></p><p>E-mail Address (Optional, but required for password recovery. Don't fill out if you're under 13.): <input name='email' type='text'/><p><p><input type='submit' value='Sign up' /></p></form><p><a href='loginscreen'>Back to Login</a></p>"
+    else:
+        redirect('/')
+@route('/signup', method='POST')
+def do_signup():
+    if (request.get_cookie("username", secret="ur38293849fhjf328923h98fr832h9rh893") == None) or (request.get_cookie("password", secret="ur38293849fhjf328923h98fr832h9rh893") == None) or (not check_login(request.get_cookie("username", secret="ur38293849fhjf328923h98fr832h9rh893"),request.get_cookie("password", secret="ur38293849fhjf328923h98fr832h9rh893"))): # If the user is not already logged in.
+        username = request.forms.get('username')
+        password = hash(request.forms.get('password'))
+        email = request.forms.get('email')
+        usernames = []
+        for i in users:
+            usernames.append(i.username)
+        if not username in usernames:
+            if username == "" or password == "":
+                return "<p>Signup was unsuccessful. Please provide a username and a password.</p><form action='signup' method='post'><p>Username: <input name='username' type='text'/><p>Password: <input name='password' type='password' /></p><p>E-mail Address (Optional, but required for password recovery. Don't fill out if you're under 13.): <input name='email' type='text'/></p><p><input type='submit' value='Sign up' /></p></form><p><a href='loginscreen'>Back to Login</a></p>"
+            else:
+                createUser(username,password,email)
+                return "<p>Signup was successful. You may now <a href='loginscreen'>Login</a>.</p>"
+        else:
+            return "<p>Signup was unsuccessful. That username already exists.</p><form action='signup' method='post'><p>Username: <input name='username' type='text'/><p>Password: <input name='password' type='password' /></p><p>E-mail Address (Optional, but required for password recovery. Don't fill out if you're under 13.): <input name='email' type='text'/></p><p><input type='submit' value='Sign up' /></p></form><p><a href='loginscreen'>Back to Login</a></p>"
+    else:
+        redirect('/')
+@route('/timeline')
+def timeline():
+    if (not request.get_cookie("username", secret="ur38293849fhjf328923h98fr832h9rh893") == None) and (not request.get_cookie("password", secret="ur38293849fhjf328923h98fr832h9rh893") == None) and (check_login(request.get_cookie("username", secret="ur38293849fhjf328923h98fr832h9rh893"),request.get_cookie("password", secret="ur38293849fhjf328923h98fr832h9rh893"))): # If the user is already logged in.
+        return "<p><a href='/timeline'>Timeline</a> <a href='/allposts'>All Posts</a> <a href='/userlist'>User List</a> <a href='/me'>My Profile</a> <a href='logout'>Log out</a></p><p></p><p>Post:</p><form method='post' action='post'><p><input name='post' /></p><p><input type='submit' name='submit' value='Submit' /></p><p>" +formatTimeline(getTimeline(getUserID(request.get_cookie("username", secret="ur38293849fhjf328923h98fr832h9rh893")))) +"<p><a href='/timeline'>Timeline</a> <a href='/allposts'>All Posts</a> <a href='/userlist'>User List</a> <a href='/me'>My Profile</a> <a href='logout'>Log out</a></p>"
+    else:
+        redirect('/loginscreen')
+@route('/allposts')
+def allposts():
+    if (not request.get_cookie("username", secret="ur38293849fhjf328923h98fr832h9rh893") == None) and (not request.get_cookie("password", secret="ur38293849fhjf328923h98fr832h9rh893") == None) and (check_login(request.get_cookie("username", secret="ur38293849fhjf328923h98fr832h9rh893"),request.get_cookie("password", secret="ur38293849fhjf328923h98fr832h9rh893"))): # If the user is already logged in.
+        return "<p><a href='/timeline'>Timeline</a> <a href='/allposts'>All Posts</a> <a href='/userlist'>User List</a> <a href='/me'>My Profile</a> <a href='logout'>Log out</a></p>" +formatTimeline(getAll()) +"<p><a href='/timeline'>Timeline</a> <a href='/allposts'>All Posts</a> <a href='/userlist'>User List</a> <a href='/me'>My Profile</a> <a href='logout'>Log out</a>"
+    else:
+        return "<p><a href='/loginscreen'>Log In</a> <a href='/signupscreen'>Sign Up</a> <a href='/allposts'>All Posts</a> <a href='/userlist'>User List</a></p>" +formatTimeline(getAll()) +"<p><a href='/loginscreen'>Log In</a> <a href='/signupscreen'>Sign Up</a> <a href='/allposts'>All Posts</a> <a href='/userlist'>User List</a></p>"
+@route('/logout')
+def logout():
+    response.set_cookie("username",None, secret="ur38293849fhjf328923h98fr832h9rh893")
+    response.set_cookie("password",None, secret="ur38293849fhjf328923h98fr832h9rh893")
+    response.set_cookie("a",None, secret="ur38293849fhjf328923h98fr832h9rh893")
+    redirect('/')
+@route('/post', method='POST')
+def post():
+    if (not request.get_cookie("username", secret="ur38293849fhjf328923h98fr832h9rh893") == None) and (not request.get_cookie("password", secret="ur38293849fhjf328923h98fr832h9rh893") == None) and (check_login(request.get_cookie("username", secret="ur38293849fhjf328923h98fr832h9rh893"),request.get_cookie("password", secret="ur38293849fhjf328923h98fr832h9rh893"))): # If the user is already logged in.
+        post = request.forms.get('post')
+        postAsUser(getUserID(request.get_cookie("username", secret="ur38293849fhjf328923h98fr832h9rh893")),post)
+        redirect('/timeline')
+    else:
+        redirect('/loginscreen')
+@route('/')
+def home():
+    if (not request.get_cookie("username", secret="ur38293849fhjf328923h98fr832h9rh893") == None) and (not request.get_cookie("password", secret="ur38293849fhjf328923h98fr832h9rh893") == None) and (check_login(request.get_cookie("username", secret="ur38293849fhjf328923h98fr832h9rh893"),request.get_cookie("password", secret="ur38293849fhjf328923h98fr832h9rh893"))): # If the user is already logged in.
+        redirect('/timeline')
+    else:
+        redirect('/loginscreen')
+@route('/me')
+def me():
+    if (not request.get_cookie("username", secret="ur38293849fhjf328923h98fr832h9rh893") == None) and (not request.get_cookie("password", secret="ur38293849fhjf328923h98fr832h9rh893") == None) and (check_login(request.get_cookie("username", secret="ur38293849fhjf328923h98fr832h9rh893"),request.get_cookie("password", secret="ur38293849fhjf328923h98fr832h9rh893"))): # If the user is already logged in.
+        redirect('/users/' +request.get_cookie("username", secret="ur38293849fhjf328923h98fr832h9rh893"))
+    else:
+        redirect('/loginscreen')
+@route('/users/<username>')
+def user(username):
+    if (not request.get_cookie("username", secret="ur38293849fhjf328923h98fr832h9rh893") == None) and (not request.get_cookie("password", secret="ur38293849fhjf328923h98fr832h9rh893") == None) and (check_login(request.get_cookie("username", secret="ur38293849fhjf328923h98fr832h9rh893"),request.get_cookie("password", secret="ur38293849fhjf328923h98fr832h9rh893"))): # If the user is already logged in.
+        return "<p><a href='../timeline'>Timeline</a> <a href='../allposts'>All Posts</a> <a href='../userlist'>User List</a> <a href='../me'>My Profile</a> <a href='../logout'>Log out</a></p>" +formatTimeline(users[getUserID(template("{{username}}",username=username))].posts) +"<p><a href='../timeline'>Timeline</a> <a href='../allposts'>All Posts</a> <a href='../userlist'>User List</a> <a href='../me'>My Profile</a> <a href='../logout'>Log out</a></p>"
+    else:
+        return "<p><a href='../loginscreen'>Login</a> <a href='../allposts'>All Posts</a> <a href='../userlist'>User List</a> <a href='../signupscreen'>Sign Up</a> <a href='../logout'>Log out</a></p>" +formatTimeline(users[getUserID(template("{{username}}",username=username))].posts) +"<p><a href='../timeline'>Timeline</a> <a href='../allposts'>All Posts</a> <a href='../userlist'>User List</a> <a href='../me'>My Profile</a> <a href='../logout'>Log out</a></p>"
+@route('/userlist')
+def userlist():
+    if (not request.get_cookie("username", secret="ur38293849fhjf328923h98fr832h9rh893") == None) and (not request.get_cookie("password", secret="ur38293849fhjf328923h98fr832h9rh893") == None) and (check_login(request.get_cookie("username", secret="ur38293849fhjf328923h98fr832h9rh893"),request.get_cookie("password", secret="ur38293849fhjf328923h98fr832h9rh893"))): # If the user is already logged in.
+        return "<p><a href='/timeline'>Timeline</a> <a href='/allposts'>All Posts</a> <a href='/userlist'>User List</a> <a href='/me'>My Profile</a> <a href='/logout'>Log out</a></p><p>Follow a User:</p><form method='post' action='follow'><p><input name='followee' /></p><p><input type='submit' name='submit' value='Submit' /><p>Unfollow a User:</p><form method='post' action='unfollow'><p><input name='unfollowee' /></p><p><input type='submit' name='submit' value='Submit' />" +formatUserList(users) +"<p><a href='/timeline'>Timeline</a> <a href='/allposts'>All Posts</a> <a href='/userlist'>User List</a> <a href='/me'>My Profile</a> <a href='/logout'>Log out</a></p>"
+    else:
+        return "<p><a href='/loginscreen'>Login</a> <a href='/allposts'>All Posts</a> <a href='/userlist'>User List</a> <a href='/signupscreen'>Sign Up</a></p>" +formatUserList(users) +"<p><a href='/loginscreen'>Login</a> <a href='/allposts'>All Posts</a> <a href='/userlist'>User List</a> <a href='/signupscreen'>Sign Up</a></p>"
+
+@route('/follow', method='POST')
+def follow():
+    if (not request.get_cookie("username", secret="ur38293849fhjf328923h98fr832h9rh893") == None) and (not request.get_cookie("password", secret="ur38293849fhjf328923h98fr832h9rh893") == None) and (check_login(request.get_cookie("username", secret="ur38293849fhjf328923h98fr832h9rh893"),request.get_cookie("password", secret="ur38293849fhjf328923h98fr832h9rh893"))): # If the user is already logged in.
+        followee = request.forms.get('followee')
+        if not getUserID(followee) == None:
+            followUser(getUserID(request.get_cookie("username", secret="ur38293849fhjf328923h98fr832h9rh893")),getUserID(followee))
+            redirect('/userlist')
+            print "follow success"
+        else:
+            print "follow fail"
+    else:
+        redirect('/loginscreen')
+@route('/unfollow', method='POST')
+def unfollow():
+    if (not request.get_cookie("username", secret="ur38293849fhjf328923h98fr832h9rh893") == None) and (not request.get_cookie("password", secret="ur38293849fhjf328923h98fr832h9rh893") == None) and (check_login(request.get_cookie("username", secret="ur38293849fhjf328923h98fr832h9rh893"),request.get_cookie("password", secret="ur38293849fhjf328923h98fr832h9rh893"))): # If the user is already logged in.
+        followee = request.forms.get('unfollowee')
+        if not getUserID(unfollowee) == None:
+            unfollowUser(getUserID(request.get_cookie("username", secret="ur38293849fhjf328923h98fr832h9rh893")),getUserID(unfollowee))
+            redirect('/userlist')
+            print "unfollow success"
+        else:
+            print "unfollow fail"
+    else:
+        redirect('/loginscreen')
+@error(404)
+def error404(error):
+	print "404 info:"
+	print str(datetime.datetime.now()) +", " +str(request.environ.get('REMOTE_ADDR'))
+	print request
+	print request.get
+	for i in request.headers:
+		print i +": " + request.headers.get(i)
+	return """
+    <!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML 2.0//EN">
+    <html>
+        <head>
+            <title>Error: 404 Not Found</title>
+            <style type="text/css">
+              html {background-color: #eee; font-family: sans-serif;}
+              body {background-color: #fff; border: 1px solid #ddd;
+                    padding: 15px; margin: 15px;}
+              pre {background-color: #eee; border: 1px solid #ddd; padding: 5px;}
+            </style>
+        </head>
+        <body>
+            <h1>Error: 404 Not Found</h1>
+            <p>Sorry, the requested URL <tt>&#039;http://104.236.156.40:8080/THIS_IS_NK_I_AM_TESTING_THE_404_PAGE&#039;</tt>
+               caused an error:</p>
+            <pre>Not found: &#039;/THIS_IS_NK_I_AM_TESTING_THE_404_PAGE&#039;</pre>
+        </body>
+    </html>
+"""
+run(host=raw_input("Hostname of this server? "), port=input("Port that you want to host NQAsocial on? "), debug=True) #Comment out to use this as a db query helper.
