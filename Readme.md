@@ -1,5 +1,7 @@
 #NQAsocial
 
+[![Join the chat at https://gitter.im/zippynk/NQAsocial](https://badges.gitter.im/Join%20Chat.svg)](https://gitter.im/zippynk/NQAsocial?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
+
 NQAsocial is a very simple, one-click setup social network, written in Python and Bottle.py. It is intended to be portable to the point where one can both run a server and connect to one just about anywhere, on any computing device.
 
 This level of portablity is done by writing the server and all of its dependencies in pure Python, and creating the HTML pages served by it without any CSS. Examples of its utility include running a server on an iOS or Android device (via a Python app), and connecting to an NQAsocial site using simple browsers (e.g. Lynx or the browser that comes with a non-smartphone).	
